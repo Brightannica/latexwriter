@@ -1,5 +1,6 @@
 const WebSocket = require('ws');
 const http = require('http');
+const crypto = require('crypto');
 
 const PORT = process.env.PORT || 3000;
 
@@ -129,7 +130,7 @@ server.on('upgrade', (req, socket, head) => {
     return;
   }
   
-  // Bypass header validation by directly creating WebSocket
+  // Use handleUpgrade with verifyClient to bypass header validation
   wss.handleUpgrade(req, socket, head, (ws) => {
     wss.emit('connection', ws, req);
   });
