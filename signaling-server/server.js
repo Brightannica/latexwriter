@@ -118,8 +118,11 @@ const server = http.createServer((req, res) => {
   res.end('Not found');
 });
 
-// Create WebSocket server but don't auto-handle upgrades
-const wss = new WebSocket.Server({ noServer: true });
+// Use WebSocket server with path filtering
+const wss = new WebSocket.Server({ 
+  server,
+  path: '/ws/'
+});
 
 wss.on('connection', (ws, req) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
@@ -149,19 +152,6 @@ wss.on('connection', (ws, req) => {
   ws.on('error', (err) => {
     console.error('WebSocket error:', err);
   });
-});
-
-// Manually handle upgrade requests (needed for proxies like Render)
-server.on('upgrade', (req, socket, head) => {
-  // Handle WebSocket upgrade for /ws/ paths
-  const url = new URL(req.url, `http://${req.headers.host}`);
-  if (url.pathname.startsWith('/ws/')) {
-    wss.handleUpgrade(req, socket, head, (ws) => {
-      wss.emit('connection', ws, req);
-    });
-  } else {
-    socket.destroy();
-  }
 });
 
 server.listen(PORT, () => {
