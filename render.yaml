@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: cs16-signaling-server
+    name: cs16-signal
     runtime: node
     buildCommand: npm ci --only=production
     startCommand: node server.js
