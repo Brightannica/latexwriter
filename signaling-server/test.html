@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Signaling Server Test</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
+    .status { padding: 1rem; border-radius: 4px; margin: 1rem 0; }
+    .connected { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+    .disconnected { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+    .connecting { background: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
+    input, button { padding: 0.5rem; margin: 0.25rem; }
+    #log { background: #1e1e1e; color: #d4d4d4; padding: 1rem; height: 300px; overflow-y: auto; font-family: monospace; font-size: 0.875rem; border-radius: 4px; }
+    .log-entry { margin: 0.25rem 0; }
+    .sent { color: #4ec9b0; }
+    .received { color: #ce9178; }
+    .error { color: #f44747; }
+  </style>
+</head>
+<body>
+  <h1>WebRTC Signaling Server Test</h1>
+  
+  <div>
+    <label>Server URL: </label>
+    <input type="text" id="serverUrl" value="wss://YOUR-APP.onrender.com/ws/test-room" style="width: 50%;">
+    <button id="connectBtn">Connect</button>
+    <button id="disconnectBtn" disabled>Disconnect</button>
+  </div>
+  
+  <div>
+    <label>Client ID: </label>
+    <input type="text" id="clientId" value="client-" placeholder="Auto-generated if empty">
+    <label>Name: </label>
+    <input type="text" id="clientName" value="Player" placeholder="Your name">
+  </div>
+  
+  <div id="status" class="status disconnected">Disconnected</div>
+  
+  <h3>Test Signaling</h3>
+  <button id="sendOfferBtn" disabled>Send Offer (to first peer)</button>
+  <button id="sendAnswerBtn" disabled>Send Answer</button>
+  <button id="sendIceBtn" disabled>Send ICE Candidate</button>
+  <button id="leaveBtn" disabled>Leave Room</button>
+  
+  <h3>Log</h3>
+  <div id="log"></div>
+
+  <script>
+    const logEl = document.getElementById('log');
+    const statusEl = document.getElementById('status');
+    let ws = null;
+    let peers = [];
+    let myId = null;
+
+    function log(msg, type = '') {
+      const entry = document.createElement('div');
+      entry.className = `log-entry ${type}`;
+      entry.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+      logEl.appendChild(entry);
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function setStatus(text, className) {
+      statusEl.textContent = text;
+      statusEl.className = `status ${className}`;
+    }
+
+    function generateId() {
+      return 'client-' + Math.random().toString(36).substr(2, 9);
+    }
+
+    document.getElementById('connectBtn').onclick = () => {
+      const url = document.getElementById('serverUrl').value.trim();
+      if (!url || url.includes('YOUR-APP')) {
+        alert('Please enter your deployed signaling server URL');
+        return;
+      }
+
+      myId = document.getElementById('clientId').value.trim() || generateId();
+      const name = document.getElementById('clientName').value.trim() || 'Player';
+      document.getElementById('clientId').value = myId;
+
+      ws = new WebSocket(url);
+      
+      ws.onopen = () => {
+        setStatus('Connected', 'connected');
+        log('WebSocket connected', 'sent');
+        ws.send(JSON.stringify({ type: 'join', clientId: myId, name }));
+      };
+
+      ws.onmessage = (event) => {
+        const msg = JSON.parse(event.data);
+        log(`Received: ${msg.type}`, 'received');
+        
+        switch (msg.type) {
+          case 'peers':
+            peers = msg.peers;
+            log(`Peers in room: ${peers.map(p => p.name).join(', ') || 'none'}`);
+            updateButtons();
+            break;
+          case 'peer-joined':
+            peers.push({ id: msg.clientId, name: msg.name });
+            log(`${msg.name} joined`);
+            updateButtons();
+            break;
+          case 'peer-left':
+            peers = peers.filter(p => p.id !== msg.clientId);
+            log(`${msg.clientId} left`);
+            updateButtons();
+            break;
+          case 'offer':
+            log(`Offer from ${msg.fromId}`);
+            break;
+          case 'answer':
+            log(`Answer from ${msg.fromId}`);
+            break;
+          case 'ice-candidate':
+            log(`ICE from ${msg.fromId}`);
+            break;
+        }
+      };
+
+      ws.onclose = () => {
+        setStatus('Disconnected', 'disconnected');
+        log('WebSocket closed');
+        updateButtons();
+      };
+
+      ws.onerror = (err) => {
+        log(`Error: ${err.message}`, 'error');
+      };
+
+      document.getElementById('connectBtn').disabled = true;
+      document.getElementById('disconnectBtn').disabled = false;
+      updateButtons();
+    };
+
+    document.getElementById('disconnectBtn').onclick = () => {
+      if (ws) {
+        ws.send(JSON.stringify({ type: 'leave', clientId: myId }));
+        ws.close();
+      }
+      document.getElementById('connectBtn').disabled = false;
+      document.getElementById('disconnectBtn').disabled = true;
+      updateButtons();
+    };
+
+    function updateButtons() {
+      const hasPeers = peers.length > 0;
+      document.getElementById('sendOfferBtn').disabled = !hasPeers;
+      document.getElementById('sendAnswerBtn').disabled = !hasPeers;
+      document.getElementById('sendIceBtn').disabled = !hasPeers;
+      document.getElementById('leaveBtn').disabled = ws?.readyState !== WebSocket.OPEN;
+    }
+
+    function sendToFirstPeer(type, data) {
+      if (peers.length === 0) return;
+      const target = peers[0];
+      ws.send(JSON.stringify({ type, targetId: target.id, fromId: myId, data }));
+      log(`Sent ${type} to ${target.name}`, 'sent');
+    }
+
+    document.getElementById('sendOfferBtn').onclick = () => 
+      sendToFirstPeer('offer', { sdp: 'fake-offer-sdp', type: 'offer' });
+
+    document.getElementById('sendAnswerBtn').onclick = () => 
+      sendToFirstPeer('answer', { sdp: 'fake-answer-sdp', type: 'answer' });
+
+    document.getElementById('sendIceBtn').onclick = () => 
+      sendToFirstPeer('ice-candidate', { candidate: 'fake-ice', sdpMid: '0', sdpMLineIndex: 0 });
+
+    document.getElementById('leaveBtn').onclick = () => {
+      ws.send(JSON.stringify({ type: 'leave', clientId: myId }));
+    };
+  </script>
+</body>
+</html>
