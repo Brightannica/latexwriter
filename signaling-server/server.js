@@ -114,17 +114,12 @@ const server = http.createServer((req, res) => {
     return;
   }
   
-  // Return 200 for /ws/* paths so HTTP probes from the game client succeed
+  // Return 200 for all paths so HTTP probes from the game client succeed
   // (WebSocket upgrade is handled separately by the upgrade event)
+  // This prevents 404 errors that make the game think the server is down
   const url = new URL(req.url, `http://${req.headers.host}`);
-  if (url.pathname.startsWith('/ws/')) {
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('OK');
-    return;
-  }
-  
-  res.writeHead(404);
-  res.end('Not found');
+  res.writeHead(200, { 'Content-Type': 'text/plain' });
+  res.end('OK');
 });
 
 // Use standard WebSocket server with path option
