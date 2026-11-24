@@ -1,8 +1,10 @@
 services:
   - type: web
     name: cs16-signaling-server
-    runtime: docker
-    dockerfilePath: Dockerfile
+    runtime: node
+    rootDir: signaling-server
+    buildCommand: npm ci --only=production
+    startCommand: node server.js
     plan: free
     healthCheckPath: /health
     envVars:
