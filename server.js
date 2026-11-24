@@ -1,6 +1,5 @@
 const WebSocket = require('ws');
 const http = require('http');
-const crypto = require('crypto');
 
 const PORT = process.env.PORT || 3000;
 
@@ -119,21 +118,14 @@ const server = http.createServer((req, res) => {
   res.end('Not found');
 });
 
-// Use noServer mode and handle upgrades manually
-const wss = new WebSocket.Server({ noServer: true });
-
-server.on('upgrade', (req, socket, head) => {
-  const url = new URL(req.url, `http://${req.headers.host}`);
-  
-  if (!url.pathname.startsWith('/ws/')) {
-    socket.destroy();
-    return;
+// Use standard WebSocket server with path option
+const wss = new WebSocket.Server({ 
+  server,
+  path: '/ws/',
+  verifyClient: (info, callback) => {
+    // Accept all connections
+    callback(true);
   }
-  
-  // Use handleUpgrade with verifyClient to bypass header validation
-  wss.handleUpgrade(req, socket, head, (ws) => {
-    wss.emit('connection', ws, req);
-  });
 });
 
 wss.on('connection', (ws, req) => {
