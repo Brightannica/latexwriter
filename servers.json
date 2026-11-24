@@ -80,9 +80,9 @@
         "Private",
         "Friends only"
       ],
-      "signal": "wss://latexwriter.onrender.com/ws/global-strike",
-      "probe": "https://latexwriter.onrender.com/health",
-      "status": "https://latexwriter.onrender.com/health"
+      "signal": "/ws/global-strike",
+      "probe": "/health",
+      "status": "/health"
     }
   ]
 }
