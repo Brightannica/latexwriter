@@ -97,8 +97,13 @@ function handleLeave(ws, roomId, clientId) {
   }
 }
 
+const fs = require('fs');
+const path = require('path');
+
 const server = http.createServer((req, res) => {
-  if (req.url === '/health' || req.url === '/') {
+  const url = new URL(req.url, `http://${req.headers.host}`);
+  
+  if (url.pathname === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ status: 'ok', rooms: rooms.size, uptime: process.uptime() }));
     return;
@@ -114,10 +119,22 @@ const server = http.createServer((req, res) => {
     return;
   }
   
-  // Return 200 for all paths so HTTP probes from the game client succeed
-  // (WebSocket upgrade is handled separately by the upgrade event)
-  // This prevents 404 errors that make the game think the server is down
-  const url = new URL(req.url, `http://${req.headers.host}`);
+  // Serve static files (game) from the repo root
+  let filePath = path.join(__dirname, url.pathname === '/' ? 'index.html' : url.pathname);
+  if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+    const ext = path.extname(filePath).toLowerCase();
+    const mimeTypes = {
+      '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css',
+      '.json': 'application/json', '.wasm': 'application/wasm', '.so': 'application/octet-stream',
+      '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml',
+      '.zip': 'application/zip', '.ico': 'image/x-icon'
+    };
+    res.writeHead(200, { 'Content-Type': mimeTypes[ext] || 'application/octet-stream' });
+    fs.createReadStream(filePath).pipe(res);
+    return;
+  }
+  
+  // Return 200 for all other paths so HTTP probes from the game client succeed
   res.writeHead(200, { 'Content-Type': 'text/plain' });
   res.end('OK');
 });
