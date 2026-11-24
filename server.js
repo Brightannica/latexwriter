@@ -1,4 +1,4 @@
-const WebSocket = require('ws');
+const WebSocket = require('websocket').server;
 const http = require('http');
 
 const PORT = process.env.PORT || 3000;
@@ -19,8 +19,8 @@ function broadcastToRoom(roomId, message, excludeWs = null) {
   
   const data = JSON.stringify(message);
   for (const [ws, clientInfo] of room.entries()) {
-    if (ws !== excludeWs && ws.readyState === WebSocket.OPEN) {
-      ws.send(data);
+    if (ws !== excludeWs && ws.connected) {
+      ws.sendUTF(data);
     }
   }
 }
@@ -45,15 +45,15 @@ function handleMessage(ws, roomId, message) {
           peers.push({ id: clientInfo.id, name: clientInfo.name });
         }
       }
-      ws.send(JSON.stringify({ type: 'peers', peers }));
+      ws.sendUTF(JSON.stringify({ type: 'peers', peers }));
       break;
       
     case 'offer':
     case 'answer':
     case 'ice-candidate':
       const targetWs = findClientById(roomId, message.targetId);
-      if (targetWs && targetWs.readyState === WebSocket.OPEN) {
-        targetWs.send(JSON.stringify({
+      if (targetWs && targetWs.connected) {
+        targetWs.sendUTF(JSON.stringify({
           type: message.type,
           fromId: message.fromId,
           data: message.data
@@ -118,36 +118,43 @@ const server = http.createServer((req, res) => {
   res.end('Not found');
 });
 
-// Use standard WebSocket server attached to HTTP server
-const wss = new WebSocket.Server({ server });
+const wsServer = new WebSocket({
+  httpServer: server,
+  autoAcceptConnections: false
+});
 
-wss.on('connection', (ws, req) => {
-  const url = new URL(req.url, `http://${req.headers.host}`);
+wsServer.on('request', (request) => {
+  const url = new URL(request.resource, `http://${request.host}`);
+  
+  if (!url.pathname.startsWith('/ws/')) {
+    request.reject(404, 'Not found');
+    return;
+  }
+  
   const roomId = url.pathname.split('/').filter(Boolean)[1] || 'default';
+  const connection = request.accept(null, request.origin);
   
   console.log(`New connection to room: ${roomId}`);
   
-  ws.on('message', (data) => {
-    try {
-      const message = JSON.parse(data.toString());
-      handleMessage(ws, roomId, message);
-    } catch (err) {
-      console.error('Error parsing message:', err);
-    }
-  });
-  
-  ws.on('close', () => {
-    for (const [rid, room] of rooms.entries()) {
-      if (room.has(ws)) {
-        const clientInfo = room.get(ws);
-        handleLeave(ws, rid, clientInfo.id);
-        break;
+  connection.on('message', (message) => {
+    if (message.type === 'utf8') {
+      try {
+        const data = JSON.parse(message.utf8Data);
+        handleMessage(connection, roomId, data);
+      } catch (err) {
+        console.error('Error parsing message:', err);
       }
     }
   });
   
-  ws.on('error', (err) => {
-    console.error('WebSocket error:', err);
+  connection.on('close', () => {
+    for (const [rid, room] of rooms.entries()) {
+      if (room.has(connection)) {
+        const clientInfo = room.get(connection);
+        handleLeave(connection, rid, clientInfo.id);
+        break;
+      }
+    }
   });
 });
 
