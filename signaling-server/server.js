@@ -1,5 +1,6 @@
 const WebSocket = require('ws');
 const http = require('http');
+const crypto = require('crypto');
 
 const PORT = process.env.PORT || 3000;
 
@@ -118,15 +119,45 @@ const server = http.createServer((req, res) => {
   res.end('Not found');
 });
 
-// Use WebSocket server with path filtering
-const wss = new WebSocket.Server({ 
-  server,
-  path: '/ws/'
-});
-
-wss.on('connection', (ws, req) => {
+// Manually handle WebSocket upgrades to avoid duplicate headers from Cloudflare
+server.on('upgrade', (req, socket, head) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
+  if (!url.pathname.startsWith('/ws/')) {
+    socket.destroy();
+    return;
+  }
+  
   const roomId = url.pathname.split('/').filter(Boolean)[1] || 'default';
+  
+  // Check for WebSocket upgrade headers
+  const key = req.headers['sec-websocket-key'];
+  const version = req.headers['sec-websocket-version'];
+  
+  if (!key || version !== '13') {
+    socket.write('HTTP/1.1 400 Bad Request\r\n\r\n');
+    socket.destroy();
+    return;
+  }
+  
+  // Compute accept key
+  const acceptKey = crypto
+    .createHash('sha1')
+    .update(key + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11')
+    .digest('base64');
+  
+  // Send 101 response with clean headers (no duplicates)
+  const headers = [
+    'HTTP/1.1 101 Switching Protocols',
+    'Upgrade: websocket',
+    'Connection: Upgrade',
+    `Sec-WebSocket-Accept: ${acceptKey}`,
+    '\r\n'
+  ].join('\r\n');
+  
+  socket.write(headers);
+  
+  // Create WebSocket from upgraded socket
+  const ws = new WebSocket(socket, [], { head });
   
   console.log(`New connection to room: ${roomId}`);
   
