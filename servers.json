@@ -1,5 +1,5 @@
 {
-  "_comment": "Endpoint + server list for the CS 1.6 launcher. Edit and redeploy - no client rebuild needed. 'signal' is the WebRTC signalling endpoint (path on this host, or a full ws:// URL); 'probe' is any small file on the same listener, used to measure round-trip time.",
+  "_comment": "Endpoint + server list for the CS 1.6 launcher. Edit and redeploy - no client rebuild needed. 'signal' is the WebRTC signalling endpoint (path on this host, or a full ws:// or wss:// URL); 'probe' is any small file on the same listener, used to measure round-trip time. For custom servers, deploy the signaling-server/ folder to a free platform (Render, Railway, Fly.io) and use the wss:// URL.",
   "gamefiles": "/cs16/gamefiles.zip",
   "servers": [
     {
@@ -69,6 +69,20 @@
       "signal": "/cs16/office/websocket",
       "probe": "/cs16/office/favicon-16x16.png",
       "status": "/cs16/status"
+    },
+    {
+      "id": "custom-template",
+      "name": "📝 Custom Server (Deploy your own)",
+      "map": "de_dust2",
+      "slots": 16,
+      "region": "Your Region",
+      "tags": [
+        "Private",
+        "Friends only"
+      ],
+      "signal": "wss://YOUR-APP-NAME.onrender.com/ws/your-room-name",
+      "probe": "https://YOUR-APP-NAME.onrender.com/health",
+      "status": "https://YOUR-APP-NAME.onrender.com/health"
     }
   ]
 }
