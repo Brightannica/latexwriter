@@ -30,34 +30,27 @@ function handleMessage(ws, roomId, message) {
   
   switch (message.type) {
     case 'join':
-      // Register this client in the room
       room.set(ws, { id: message.clientId, name: message.name });
       console.log(`Client ${message.clientId} joined room ${roomId}`);
       
-      // Notify others in the room
       broadcastToRoom(roomId, {
         type: 'peer-joined',
         clientId: message.clientId,
         name: message.name
       }, ws);
       
-      // Send current peers to the new client
       const peers = [];
       for (const [, clientInfo] of room.entries()) {
         if (clientInfo.id !== message.clientId) {
           peers.push({ id: clientInfo.id, name: clientInfo.name });
         }
       }
-      ws.send(JSON.stringify({
-        type: 'peers',
-        peers
-      }));
+      ws.send(JSON.stringify({ type: 'peers', peers }));
       break;
       
     case 'offer':
     case 'answer':
     case 'ice-candidate':
-      // Forward signaling messages to specific peer
       const targetWs = findClientById(roomId, message.targetId);
       if (targetWs && targetWs.readyState === WebSocket.OPEN) {
         targetWs.send(JSON.stringify({
@@ -96,13 +89,8 @@ function handleLeave(ws, roomId, clientId) {
   room.delete(ws);
   console.log(`Client ${clientId} left room ${roomId}`);
   
-  // Notify others
-  broadcastToRoom(roomId, {
-    type: 'peer-left',
-    clientId
-  });
+  broadcastToRoom(roomId, { type: 'peer-left', clientId });
   
-  // Clean up empty rooms
   if (room.size === 0) {
     rooms.delete(roomId);
     console.log(`Room ${roomId} deleted (empty)`);
@@ -110,14 +98,12 @@ function handleLeave(ws, roomId, clientId) {
 }
 
 const server = http.createServer((req, res) => {
-  // Health check endpoint
   if (req.url === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ status: 'ok', rooms: rooms.size }));
     return;
   }
   
-  // CORS headers for browser clients
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -132,10 +118,10 @@ const server = http.createServer((req, res) => {
   res.end('Not found');
 });
 
-const wss = new WebSocket.Server({ server });
+// Create WebSocket server but don't auto-handle upgrades
+const wss = new WebSocket.Server({ noServer: true });
 
 wss.on('connection', (ws, req) => {
-  // Extract room ID from URL path: /ws/:roomId
   const url = new URL(req.url, `http://${req.headers.host}`);
   const roomId = url.pathname.split('/').filter(Boolean)[1] || 'default';
   
@@ -151,7 +137,6 @@ wss.on('connection', (ws, req) => {
   });
   
   ws.on('close', () => {
-    // Find which room this client was in and clean up
     for (const [rid, room] of rooms.entries()) {
       if (room.has(ws)) {
         const clientInfo = room.get(ws);
@@ -164,6 +149,19 @@ wss.on('connection', (ws, req) => {
   ws.on('error', (err) => {
     console.error('WebSocket error:', err);
   });
+});
+
+// Manually handle upgrade requests (needed for proxies like Render)
+server.on('upgrade', (req, socket, head) => {
+  // Handle WebSocket upgrade for /ws/ paths
+  const url = new URL(req.url, `http://${req.headers.host}`);
+  if (url.pathname.startsWith('/ws/')) {
+    wss.handleUpgrade(req, socket, head, (ws) => {
+      wss.emit('connection', ws, req);
+    });
+  } else {
+    socket.destroy();
+  }
 });
 
 server.listen(PORT, () => {
