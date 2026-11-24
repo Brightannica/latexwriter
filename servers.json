@@ -80,9 +80,9 @@
         "Private",
         "Friends only"
       ],
-      "signal": "/ws/global-strike",
-      "probe": "/health",
-      "status": "/health"
+      "signal": "wss://cs16-signal.hebrighton.workers.dev/ws/global-strike",
+      "probe": "https://cs16-signal.hebrighton.workers.dev/health",
+      "status": "https://cs16-signal.hebrighton.workers.dev/health"
     }
   ]
 }
