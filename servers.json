@@ -71,18 +71,18 @@
       "status": "/cs16/status"
     },
     {
-      "id": "custom-template",
-      "name": "📝 Custom Server (Deploy your own)",
+      "id": "latexwriter",
+      "name": "🎯 LatexWriter | Private",
       "map": "de_dust2",
       "slots": 16,
-      "region": "Your Region",
+      "region": "US West",
       "tags": [
         "Private",
         "Friends only"
       ],
-      "signal": "wss://YOUR-APP-NAME.onrender.com/ws/your-room-name",
-      "probe": "https://YOUR-APP-NAME.onrender.com/health",
-      "status": "https://YOUR-APP-NAME.onrender.com/health"
+      "signal": "wss://latexwriter.onrender.com/ws/global-strike",
+      "probe": "https://latexwriter.onrender.com/health",
+      "status": "https://latexwriter.onrender.com/health"
     }
   ]
 }
