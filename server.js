@@ -98,14 +98,12 @@ function handleLeave(ws, roomId, clientId) {
 }
 
 const server = http.createServer((req, res) => {
-  // Health check endpoint - MUST respond quickly for Render health checks
   if (req.url === '/health' || req.url === '/') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ status: 'ok', rooms: rooms.size, uptime: process.uptime() }));
     return;
   }
   
-  // CORS for browser clients
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -120,23 +118,8 @@ const server = http.createServer((req, res) => {
   res.end('Not found');
 });
 
-// Create WebSocket server with noServer - we handle upgrades manually
-const wss = new WebSocket.Server({ noServer: true });
-
-// Manually handle upgrade requests
-server.on('upgrade', (req, socket, head) => {
-  const url = new URL(req.url, `http://${req.headers.host}`);
-  
-  // Only handle WebSocket upgrades for /ws/ paths
-  if (url.pathname.startsWith('/ws/')) {
-    wss.handleUpgrade(req, socket, head, (ws) => {
-      wss.emit('connection', ws, req);
-    });
-  } else {
-    // Not a WebSocket path - destroy connection
-    socket.destroy();
-  }
-});
+// Use standard WebSocket server attached to HTTP server
+const wss = new WebSocket.Server({ server });
 
 wss.on('connection', (ws, req) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
