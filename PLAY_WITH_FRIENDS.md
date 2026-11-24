@@ -12,9 +12,8 @@ This guide shows you how to deploy a free signaling server so you can play CS 1.
 4. Connect your GitHub repo
 5. Configure:
    - **Name**: `cs16-signaling` (or whatever you like)
-   - **Runtime**: `Node`
-   - **Build Command**: `npm ci --only=production`
-   - **Start Command**: `node signaling-server/server.js`
+   - **Runtime**: `Docker`
+   - Render auto-detects the `Dockerfile` at repo root
    - **Plan**: `Free`
 6. Click **"Create Web Service"**
 7. Wait for deploy (2-3 minutes)
