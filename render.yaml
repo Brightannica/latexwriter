@@ -2,7 +2,7 @@ services:
   - type: web
     name: cs16-signaling-server
     runtime: docker
-    dockerfilePath: Dockerfile
+    dockerfilePath: signaling-server/Dockerfile
     plan: free
     healthCheckPath: /health
     envVars:
