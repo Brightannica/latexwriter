@@ -132,7 +132,9 @@ wsServer.on('request', (request) => {
   }
   
   const roomId = url.pathname.split('/').filter(Boolean)[1] || 'default';
-  const connection = request.accept(null, request.origin);
+  
+  // Accept connection without origin validation
+  const connection = request.accept(null, '*');
   
   console.log(`New connection to room: ${roomId}`);
   
@@ -147,7 +149,7 @@ wsServer.on('request', (request) => {
     }
   });
   
-  connection.on('close', () => {
+  connection.on('close', (reasonCode, description) => {
     for (const [rid, room] of rooms.entries()) {
       if (room.has(connection)) {
         const clientInfo = room.get(connection);
