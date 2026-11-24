@@ -1,6 +1,5 @@
 const WebSocket = require('ws');
 const http = require('http');
-const crypto = require('crypto');
 
 const PORT = process.env.PORT || 3000;
 
@@ -121,73 +120,52 @@ const server = http.createServer((req, res) => {
   res.end('Not found');
 });
 
-// Manually handle WebSocket upgrades to avoid Cloudflare duplicate headers
+// Create WebSocket server with noServer - we handle upgrades manually
+const wss = new WebSocket.Server({ noServer: true });
+
+// Manually handle upgrade requests
 server.on('upgrade', (req, socket, head) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
   
-  // Handle WebSocket upgrade for /ws/ paths
+  // Only handle WebSocket upgrades for /ws/ paths
   if (url.pathname.startsWith('/ws/')) {
-    const roomId = url.pathname.split('/').filter(Boolean)[1] || 'default';
-    
-    // Check for WebSocket upgrade headers
-    const key = req.headers['sec-websocket-key'];
-    const version = req.headers['sec-websocket-version'];
-    
-    if (!key || version !== '13') {
-      socket.write('HTTP/1.1 400 Bad Request\r\n\r\n');
-      socket.destroy();
-      return;
-    }
-    
-    // Compute accept key
-    const acceptKey = crypto
-      .createHash('sha1')
-      .update(key + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11')
-      .digest('base64');
-    
-    // Send 101 response with clean headers (no duplicates)
-    const headers = [
-      'HTTP/1.1 101 Switching Protocols',
-      'Upgrade: websocket',
-      'Connection: Upgrade',
-      `Sec-WebSocket-Accept: ${acceptKey}`,
-      '\r\n'
-    ].join('\r\n');
-    
-    socket.write(headers);
-    
-    // Create WebSocket from upgraded socket
-    const ws = new WebSocket(socket, [], { head });
-    
-    console.log(`New connection to room: ${roomId}`);
-    
-    ws.on('message', (data) => {
-      try {
-        const message = JSON.parse(data.toString());
-        handleMessage(ws, roomId, message);
-      } catch (err) {
-        console.error('Error parsing message:', err);
-      }
-    });
-    
-    ws.on('close', () => {
-      for (const [rid, room] of rooms.entries()) {
-        if (room.has(ws)) {
-          const clientInfo = room.get(ws);
-          handleLeave(ws, rid, clientInfo.id);
-          break;
-        }
-      }
-    });
-    
-    ws.on('error', (err) => {
-      console.error('WebSocket error:', err);
+    wss.handleUpgrade(req, socket, head, (ws) => {
+      wss.emit('connection', ws, req);
     });
   } else {
-    // Not a WebSocket upgrade - let HTTP server handle it
-    // This shouldn't happen since we only register upgrade for /ws/
+    // Not a WebSocket path - destroy connection
     socket.destroy();
   }
+});
+
+wss.on('connection', (ws, req) => {
+  const url = new URL(req.url, `http://${req.headers.host}`);
+  const roomId = url.pathname.split('/').filter(Boolean)[1] || 'default';
+  
+  console.log(`New connection to room: ${roomId}`);
+  
+  ws.on('message', (data) => {
+    try {
+      const message = JSON.parse(data.toString());
+      handleMessage(ws, roomId, message);
+    } catch (err) {
+      console.error('Error parsing message:', err);
+    }
+  });
+  
+  ws.on('close', () => {
+    for (const [rid, room] of rooms.entries()) {
+      if (room.has(ws)) {
+        const clientInfo = room.get(ws);
+        handleLeave(ws, rid, clientInfo.id);
+        break;
+      }
+    }
+  });
+  
+  ws.on('error', (err) => {
+    console.error('WebSocket error:', err);
+  });
 });
 
 server.listen(PORT, () => {
