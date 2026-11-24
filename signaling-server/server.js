@@ -114,6 +114,15 @@ const server = http.createServer((req, res) => {
     return;
   }
   
+  // Return 200 for /ws/* paths so HTTP probes from the game client succeed
+  // (WebSocket upgrade is handled separately by the upgrade event)
+  const url = new URL(req.url, `http://${req.headers.host}`);
+  if (url.pathname.startsWith('/ws/')) {
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('OK');
+    return;
+  }
+  
   res.writeHead(404);
   res.end('Not found');
 });
