@@ -1,4 +1,4 @@
-const WebSocket = require('websocket').server;
+const WebSocket = require('ws');
 const http = require('http');
 
 const PORT = process.env.PORT || 3000;
@@ -19,8 +19,8 @@ function broadcastToRoom(roomId, message, excludeWs = null) {
   
   const data = JSON.stringify(message);
   for (const [ws, clientInfo] of room.entries()) {
-    if (ws !== excludeWs && ws.connected) {
-      ws.sendUTF(data);
+    if (ws !== excludeWs && ws.readyState === WebSocket.OPEN) {
+      ws.send(data);
     }
   }
 }
@@ -45,15 +45,15 @@ function handleMessage(ws, roomId, message) {
           peers.push({ id: clientInfo.id, name: clientInfo.name });
         }
       }
-      ws.sendUTF(JSON.stringify({ type: 'peers', peers }));
+      ws.send(JSON.stringify({ type: 'peers', peers }));
       break;
       
     case 'offer':
     case 'answer':
     case 'ice-candidate':
       const targetWs = findClientById(roomId, message.targetId);
-      if (targetWs && targetWs.connected) {
-        targetWs.sendUTF(JSON.stringify({
+      if (targetWs && targetWs.readyState === WebSocket.OPEN) {
+        targetWs.send(JSON.stringify({
           type: message.type,
           fromId: message.fromId,
           data: message.data
@@ -118,45 +118,50 @@ const server = http.createServer((req, res) => {
   res.end('Not found');
 });
 
-const wsServer = new WebSocket({
-  httpServer: server,
-  autoAcceptConnections: false
-});
+// Use noServer mode and handle upgrades manually
+const wss = new WebSocket.Server({ noServer: true });
 
-wsServer.on('request', (request) => {
-  const url = new URL(request.resource, `http://${request.host}`);
+server.on('upgrade', (req, socket, head) => {
+  const url = new URL(req.url, `http://${req.headers.host}`);
   
   if (!url.pathname.startsWith('/ws/')) {
-    request.reject(404, 'Not found');
+    socket.destroy();
     return;
   }
   
+  // Bypass header validation by directly creating WebSocket
+  wss.handleUpgrade(req, socket, head, (ws) => {
+    wss.emit('connection', ws, req);
+  });
+});
+
+wss.on('connection', (ws, req) => {
+  const url = new URL(req.url, `http://${req.headers.host}`);
   const roomId = url.pathname.split('/').filter(Boolean)[1] || 'default';
-  
-  // Accept connection without origin validation
-  const connection = request.accept(null, '*');
   
   console.log(`New connection to room: ${roomId}`);
   
-  connection.on('message', (message) => {
-    if (message.type === 'utf8') {
-      try {
-        const data = JSON.parse(message.utf8Data);
-        handleMessage(connection, roomId, data);
-      } catch (err) {
-        console.error('Error parsing message:', err);
+  ws.on('message', (data) => {
+    try {
+      const message = JSON.parse(data.toString());
+      handleMessage(ws, roomId, message);
+    } catch (err) {
+      console.error('Error parsing message:', err);
+    }
+  });
+  
+  ws.on('close', () => {
+    for (const [rid, room] of rooms.entries()) {
+      if (room.has(ws)) {
+        const clientInfo = room.get(ws);
+        handleLeave(ws, rid, clientInfo.id);
+        break;
       }
     }
   });
   
-  connection.on('close', (reasonCode, description) => {
-    for (const [rid, room] of rooms.entries()) {
-      if (room.has(connection)) {
-        const clientInfo = room.get(connection);
-        handleLeave(connection, rid, clientInfo.id);
-        break;
-      }
-    }
+  ws.on('error', (err) => {
+    console.error('WebSocket error:', err);
   });
 });
 
