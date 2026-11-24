@@ -121,15 +121,22 @@ const server = http.createServer((req, res) => {
 // Use standard WebSocket server with path option
 const wss = new WebSocket.Server({ 
   server,
-  path: '/ws/',
   verifyClient: (info, callback) => {
-    // Accept all connections
+    const url = new URL(info.req.url, `http://${info.req.headers.host}`);
+    if (!url.pathname.startsWith('/ws/')) {
+      callback(false, 404, 'Not found');
+      return;
+    }
     callback(true);
   }
 });
 
 wss.on('connection', (ws, req) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
+  if (!url.pathname.startsWith('/ws/')) {
+    ws.close();
+    return;
+  }
   const roomId = url.pathname.split('/').filter(Boolean)[1] || 'default';
   
   console.log(`New connection to room: ${roomId}`);
