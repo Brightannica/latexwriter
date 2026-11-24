@@ -2,9 +2,8 @@ services:
   - type: web
     name: cs16-signaling-server
     runtime: node
-    rootDir: signaling-server
-    buildCommand: npm ci --only=production
-    startCommand: node server.js
+    buildCommand: cd signaling-server && npm ci --only=production
+    startCommand: cd signaling-server && node server.js
     plan: free
     healthCheckPath: /health
     envVars:
