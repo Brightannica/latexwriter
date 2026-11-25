@@ -77,7 +77,7 @@
       "slots": 16,
       "region": "US",
       "tags": [],
-      "signal": "/ws/global-strike",
+      "signal": "/cs16/latexwriter/websocket",
       "probe": "/health",
       "status": "/health"
     }

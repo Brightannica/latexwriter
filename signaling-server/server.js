@@ -144,7 +144,7 @@ const wss = new WebSocket.Server({
   server,
   verifyClient: (info, callback) => {
     const url = new URL(info.req.url, `http://${info.req.headers.host}`);
-    if (!url.pathname.startsWith('/ws/')) {
+    if (!url.pathname.startsWith('/ws/') && !url.pathname.startsWith('/cs16/')) {
       callback(false, 404, 'Not found');
       return;
     }
@@ -154,11 +154,13 @@ const wss = new WebSocket.Server({
 
 wss.on('connection', (ws, req) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
-  if (!url.pathname.startsWith('/ws/')) {
+  if (!url.pathname.startsWith('/ws/') && !url.pathname.startsWith('/cs16/')) {
     ws.close();
     return;
   }
-  const roomId = url.pathname.split('/').filter(Boolean)[1] || 'default';
+  const parts = url.pathname.split('/').filter(Boolean);
+  // Handle both /ws/:roomId and /cs16/:name/websocket patterns
+  const roomId = parts[1] || 'default';
   
   console.log(`New connection to room: ${roomId}`);
   
