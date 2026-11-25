@@ -72,14 +72,11 @@
     },
     {
       "id": "latexwriter",
-      "name": "🎯 LatexWriter | Private",
+      "name": "LatexWriter",
       "map": "de_dust2",
       "slots": 16,
-      "region": "US West",
-      "tags": [
-        "Private",
-        "Friends only"
-      ],
+      "region": "US",
+      "tags": [],
       "signal": "/ws/global-strike",
       "probe": "/health",
       "status": "/health"
