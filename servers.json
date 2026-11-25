@@ -80,9 +80,9 @@
         "Private",
         "Friends only"
       ],
-      "signal": "wss://levitra-hunt-handbags-lobby.trycloudflare.com/ws/global-strike",
-      "probe": "https://levitra-hunt-handbags-lobby.trycloudflare.com/health",
-      "status": "https://levitra-hunt-handbags-lobby.trycloudflare.com/health"
+      "signal": "/ws/global-strike",
+      "probe": "/health",
+      "status": "/health"
     }
   ]
 }
